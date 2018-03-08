@@ -7,34 +7,15 @@
 const argv = require('yargs').argv;
 const deepAssign = require('deep-assign');
 const fs = require('fs');
-const mkdirp = require('mkdirp');
 const path = require('path');
-const SVGSpriter = require('svg-sprite');
-const Vinyl = require('vinyl');
+const svgstore = require('svgstore');
 
 const ICONS_PATH = path.join(__dirname, '..', 'icons');
 
 let options = {
     icons: '**/*.svg',
     dest: 'dist/',
-    cwd: '../',
-    config: {
-        log: 'info',
-        svg: {
-            dimensionAttributes: false
-        },
-        shape: {
-            dimension: {
-                maxWidth: 150
-            }
-        },
-        mode: {
-            symbol: {
-                sprite: 'ffe-icons.svg',
-                example: true
-            }
-        }
-    }
+    cwd: '../'
 };
 
 if (argv.opts) {
@@ -59,10 +40,8 @@ if (argv.opts) {
     }
 }
 
-options.config.dest = path.join(__dirname, options.cwd, options.dest);
 
-// https://github.com/jkphl/svg-sprite#usage-pattern
-const spriter = new SVGSpriter(options.config);
+const sprite = svgstore();
 
 fs.readdirSync(ICONS_PATH)
     .filter(fileName => fileName.match(/\.svg$/))
@@ -73,34 +52,20 @@ fs.readdirSync(ICONS_PATH)
     })
     .forEach((fileName) => {
         const iconPath = path.join(ICONS_PATH, fileName);
-        spriter.add(new Vinyl({
-            path: iconPath,
-            base: ICONS_PATH,
-            contents: fs.readFileSync(iconPath)
-        }));
+        const iconName = fileName.split('.svg')[0];
+        sprite.add(iconName, fs.readFileSync(iconPath), 'utf-8');
     });
 
 if (options.projectIcons) {
     options.projectIcons
         .forEach((fileName) => {
             const iconPath = path.join(fileName);
-            spriter.add(new Vinyl({
-                path: fileName.substring(fileName.lastIndexOf('/') - 1),
-                base: options.cwd,
-                contents: fs.readFileSync(iconPath)
-            }));
+            const iconName = fileName.split('.svg')[0];
+            sprite.add(iconName, fs.readFileSync(iconPath), 'utf-8');
         });
 }
 
-spriter.compile(function(error, result) {
-    for (const mode in result) {
-        if (Object.prototype.hasOwnProperty.call(result, mode)) {
-            for (const resource in result[mode]) {
-                if (Object.prototype.hasOwnProperty.call(result[mode], resource)) {
-                    mkdirp.sync(path.dirname(result[mode][resource].path));
-                    fs.writeFileSync(result[mode][resource].path, result[mode][resource].contents);
-                }
-            }
-        }
-    }
-});
+fs.writeFileSync(
+    path.join(__dirname, options.cwd, options.dest, 'ffe-icons.svg'),
+    sprite
+);
